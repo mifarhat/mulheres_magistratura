@@ -1,0 +1,120 @@
+---
+title: "A participação da mulher nas decisões do Judiciário"
+author: "Milene Farhat"
+date: "February 26, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+# dados github github.com/turicas
+# 25.843 dados
+df1 <- readxl::read_xls(path = '/home/mfarhat/Documents/ABJ/mulheres_magistratura/salarios-magistrados-2018-02-05.xls') %>% 
+  select(-mesano_de_referencia, -data_de_publicacao) 
+
+# dados faltantes extraídos do CNJ http://www.cnj.jus.br/transparencia/remuneracao-dos-magistrados manunal
+# 4.451 dados
+df2 <- readxl::read_xls(path = '/home/mfarhat/Documents/ABJ/mulheres_magistratura/salarios_magistrados2.xls') %>% 
+  select(-mesano_de_referencia, -data_de_publicacao)
+
+# união de df1 e df2 | retirando linhas iguais e servidores inativos/aposentados
+df <- df1 %>% 
+  bind_rows(df2) %>% 
+  select(-cpf) %>%
+  mutate(orgao = str_to_title(orgao),
+         nome = str_to_title(nome),
+         lotacao = str_to_title(lotacao)) %>%
+  distinct(nome, orgao, .keep_all = T) %>% 
+  filter(str_detect(lotacao, 'Inativo|Aposentado') == F) # 3.747 servidores inativos/aposentados
+
+# verificando nomes distintos
+nomes_df <- df %>% 
+  mutate(nome1 = nome) %>% 
+  separate(nome, into = c('primeiro_nome'), sep = ' ') %>% 
+  distinct(primeiro_nome, .keep_all = T)
+
+nomes_df$sexo <- get_gender(nomes_df$primeiro_nome)
+```
+
+Supremo Tribunal de Justiça
+
+fonte: https://www.al.sp.gov.br/noticia/?id=265255
+
+O poder judiciário é composto por ministro, desembargadores e juízes, os quais possuem a função de julgar, de maneira imparcial e isenta, situações e as pessoas nelas envolvidas de acordo com a norma criadas pelo legislativo. 
+
+O funcionamento do Poder Judiciário se dá por meio de instâncias judicantes, as quais visam a concretização dos princípios do devido processo legal, do contraditório e da ampla defesa. Em regra, a primeira instância corresponde ao órgão que analisará e julgará inicialmente a ação apresentada ao Poder Judiciário. As decisões por ela proferidas poderão ser submetidas à apreciação da instância superior, composta por órgãos colegiados, dando oportunidade às partes conflitantes de obterem o reexame da matéria. É a garantia do duplo grau de jurisdição. 
+
+Além dos recursos, cabe às instâncias superiores, em decorrência de sua competência originária, apreciar determinadas ações que, em razão da matéria ou dos cargos ocupados pelos envolvidos, lhes são apresentadas diretamente. 
+
+A Justiça Federal é composta pelos tribunais regionais federais e juízes federais, e é de sua competência julgar ações em que a União, as autarquias ou as empresas públicas federais forem interessadas. Existe a Justiça federal comum e a especializada, que é composta pelas Justiças do Trabalho, Eleitoral e Militar. 
+
+À Justiça Estadual cabe o julgamento das ações não compreendidas na competência da Justiça Federal, comum ou especializada. É, portanto, competência residual. Os Estados também têm sua Justiça Militar, cuja função é julgar os crimes próprios cometidos pelos policiais militares. 
+
+# Conselho Nacional de Justiça
+*OK - Fonte https://github.com/turicas*
+- controlar a atuação administrativa e financeira dos demais órgãos daquele poder, bem como de supervisionar o cumprimento dos deveres funcionais dos juízes. 
+
+# Supremo Tribunal Federal 
+*OK - Fonte http://www.stf.jus.br/portal/remuneracao/listarRemuneracao.asp?periodo=012018&ano=2018&mes=01&folha=1#*
+- orgão máx do poder judiciário 
+- 11 ministros 
+- brasileiros natos
+- entre 35 e 65 anos
+- são nomeados pelo Presidente da República 
+- aprovação da escolha pela maioria absoluta do Senado Federal
+- julgar ações diretas de inconstitucionalidade de lei ou ato normativo federal ou estadual; ações declaratórias de constitucionalidade de lei ou ato normativo federal; a arguição de descumprimento de preceito fundamental decorrente da própria Constituição e a extradição solicitada por Estado estrangeiro. Na área penal, destaca-se a competência para julgar, nas infrações penais comuns, o presidente da República e seu vice, os membros do Congresso Nacional, seus próprios ministros e o procurador-geral da República. 
+
+## Superior Tribunal de Justiça - STJ
+*OK*
+- 33 ministros
+- última instância da Justiça brasileira para as causas infraconstitucionais, sendo o órgão de convergência da Justiça comum
+
+### Tribunal de Justiça (27) - Justiça Comum
+*OK*
+
+### Tribunais Regionais Federais (5) - Justiça Federal
+- juízes federais
+- 7 juízes
+- nomeados pelo presidente da República.
+- sedes em Brasília, Rio de Janeiro, São Paulo, Porto Alegre e Recife.
+- processar e julgar os juízes federais da sua área e os membros do Ministério Público da União. 
+*OK*
+- Tribunal Regional Federal 1º - SERVIDOR INATIVO
+
+
+## Tribunal Superior Eleitoral - Justiça Eleitoral
+*OK - http://www.cnj.jus.br/transparencia/remuneracao-dos-magistrados*
+- no mínimo 7 ministros
+- três deles são escolhidos por meio de votação entre os ministros do STF; dois, entre os do STJ; e os outros dois são nomeados pelo presidente da República. 
+- tem a função de acompanhar a legislação eleitoral juntamente com os Tribunais Regionais Eleitorais.
+
+### Tribunais Regionais Eleitorais (27)
+- 7 julgadores
+- dois desembargadores do Tribunal de Justiça; um juiz do Tribunal Regional Federal, dois juízes de direito e dois advogados indicados pelo Tribunal de Justiça
+-  organização, fiscalização e execução do processo eleitoral nas áreas sob sua jurisdição.
+*Sem dados*
+- Tribunal Regional da Bahia (desatualizado)
+- Tribunal Regional Eleitoral do Rio de Janeiro (desatualizado)
+
+
+## Tribunal Superior do Trabalho - Justiça do Trabalho
+*OK*
+- 27 ministros 
+- nomeados pelo presidente da República e aprovados pela maioria absoluta do Senado Federal
+- função uniformizar a jurisprudência trabalhista no país
+
+### Tribunais Regionais do Trabalho (24)
+- correspondem à segunda instância na tramitação, mas detém competências originárias de julgamento, em casos de dissídios coletivos, ações rescisórias, mandados de segurança, entre outros.
+- No Estado de São Paulo, há dois Tribunais Regionais do Trabalho: o da 2ª Região, localizado na capital do Estado, com jurisdição sobre a Região Metropolitana de São Paulo e parte de Região Metropolitana da Baixada Santista, e o da 15ª Região, com sede em Campinas, com jurisdição sobre os demais municípios paulistas. 
+*sem dados:*
+- Tribunal Regional do Trabalho da 21ª Região
+
+## Superior Tribunal Militar - Justiça Militar
+*OK*
+- 15 ministros vitalícios
+- processar e julgar crimes que envolvam militares da Marinha, Exército e Aeronáutica.
+- nomeados pelo presidente da República, com indicação aprovada pelo Senado Federal. Três ministros são da Marinha, quatro do Exército e três da Aeronáutica, os outros cinco são civis. 
+
+### Tribunal de Justiça Militar
+*OK*
