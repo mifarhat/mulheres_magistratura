@@ -5,37 +5,157 @@ date: "February 26, 2018"
 output: html_document
 ---
 
+INSERIR hierarquia dos cargos
+FALAR Carmem Lúcia
+
 ```{r setup, include=FALSE}
 library(tidyverse)
 
 # dados github github.com/turicas
 # 25.843 dados
-df1 <- readxl::read_xls(path = '/home/mfarhat/Documents/ABJ/mulheres_magistratura/salarios-magistrados-2018-02-05.xls') %>% 
-  select(-mesano_de_referencia, -data_de_publicacao) 
+df1 <- readxl::read_xls(path = '/home/mfarhat/Documents/ABJ/mulheres_magistratura/salarios-magistrados-2018-02-05.xls') %>% select(-mesano_de_referencia, -data_de_publicacao) 
 
 # dados faltantes extraídos do CNJ http://www.cnj.jus.br/transparencia/remuneracao-dos-magistrados manunal
 # 4.451 dados
 df2 <- readxl::read_xls(path = '/home/mfarhat/Documents/ABJ/mulheres_magistratura/salarios_magistrados2.xls') %>% 
   select(-mesano_de_referencia, -data_de_publicacao)
 
-# união de df1 e df2 | retirando linhas iguais e servidores inativos/aposentados
+# df final
 df <- df1 %>% 
   bind_rows(df2) %>% 
   select(-cpf) %>%
   mutate(orgao = str_to_title(orgao),
          nome = str_to_title(nome),
-         lotacao = str_to_title(lotacao)) %>%
+         lotacao = str_to_title(lotacao),
+         cargo = str_to_title(cargo)) %>%
+  mutate(orgao = str_replace(orgao, 'Trf', 'Tribunal Regional Federal –')) %>% 
   distinct(nome, orgao, .keep_all = T) %>% 
-  filter(str_detect(lotacao, 'Inativo|Aposentado') == F) # 3.747 servidores inativos/aposentados
+  filter(!str_detect(lotacao, 'Inativ[oa]|Aposentad[oa]|Substitut[oa]|Desligad[oa]|Pensionista'),
+         !str_detect(cargo, 'Inativ[oa]|Aposentad[oa]|Substitut[oa]|Desligad[oa]|Pensionista')) %>%
+  mutate(cargo1 = str_extract(cargo, 
+                   '[Jj]uiz|Juíza|Desembargador|Des.|Des|Magistrad[oa]|Jurista|Ministr[oa]|Conselheiro|Corregedor')) %>%
+  filter(!is.na(cargo1)) %>% 
+  mutate(cargo1 = case_when(str_detect(cargo1,'[Jj]uiz|Juíza') ~ "Juiz", 
+                            str_detect(cargo1, 'Des.|Des') ~ "Desembargador",     
+                            str_detect(cargo1, 'Ministr[oa]') ~ "Ministro",
+                            TRUE ~ cargo1)) %>% 
+  mutate(nome1 = nome) %>% 
+  separate(nome1, into = c('primeiro_nome'), sep = ' ') %>%
+  mutate(primeiro_nome = rm_accent(primeiro_nome)) %>% 
+  left_join(nomes_df, by = 'primeiro_nome')
 
 # verificando nomes distintos
-nomes_df <- df %>% 
+df %>% 
   mutate(nome1 = nome) %>% 
   separate(nome, into = c('primeiro_nome'), sep = ' ') %>% 
-  distinct(primeiro_nome, .keep_all = T)
+  mutate(primeiro_nome = abjutils::rm_accent(primeiro_nome)) %>% 
+  distinct(primeiro_nome, .keep_all = T) %>%
+  mutate(sexo = get_gender(nomes_df$primeiro_nome)) %>%
+  saveRDS('/home/mfarhat/mulheres_magistratura/nomes_df.rds')
 
-nomes_df$sexo <- get_gender(nomes_df$primeiro_nome)
+nomes_df <- readRDS('/home/mfarhat/mulheres_magistratura/nomes_df.rds') %>% 
+  mutate(sexo = ifelse(is.na(sexo), 'Indefinido', sexo)) %>% 
+  select(primeiro_nome, sexo)
 ```
+
+
+```{r}
+oab <- readxl::read_xls(path = '/home/mfarhat/mulheres_magistratura/oab_consnacional.xls') %>% 
+  add_totals_row() %>% 
+  filter(Seccional == 'Total')
+
+oab %>%
+  select(-Seccional) %>% 
+  gather(key = Total) %>%
+  separate(Total, into = c('Tipo', 'Sexo'), sep = '[vg]') %>%
+  mutate(Sexo = ifelse(Sexo == 'F', 'Feminino', 'Masculino')) %>% 
+  group_by(Tipo) %>% 
+  mutate(Prop = value/sum(value)) %>%
+  ungroup() %>% 
+  mutate(Tipo = ifelse(Tipo == 'Ad', 'Advogados', 'Estagiários')) %>% 
+  ggplot() +
+  geom_col(aes(x = Tipo, y = Prop, fill = Sexo), position = 'dodge') +
+  theme_minimal() +
+  coord_flip() +
+  #ylim(c(0,1)) +
+  theme(legend.position = 'bottom') +
+  labs(x = '', y = '') +
+  ggtitle('Proporção de Estágiários e Advogados atuantes no Direito', subtitle = 'Fonte: OAB. 2018')
+```
+
+```{r}
+df_plot <- df %>%
+  filter(sexo != 'Indefinido') %>% 
+  mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
+  mutate(cargo1 = fct_reorder(cargo1, Sexo, fun = function(x) max(prop.table(table(x))))) %>% 
+  mutate(cargo1 = fct_other(cargo1, drop = c('Corregedor', 'Conselheiro', 'Jurista', 'Magistrado'),
+                            other_level = 'Outros'))
+
+df_aux <- df_plot %>% 
+  group_by(cargo1, sexo) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n/sum(n),
+         label = scales::percent(prop)) %>% 
+  filter(sexo == "Female")
+
+df_plot %>% 
+  ggplot() +
+  geom_bar(aes(x = cargo1, fill = Sexo), position = 'fill') +
+  geom_text(aes(x = cargo1, y = 1-prop, label = label), data = df_aux, nudge_y =0.06) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = '', y = '') +
+  theme(legend.position = 'bottom') +
+  ggtitle('Proporção de magistrados por cargo e sexo')
+```
+
+
+(incentivo para mulheres irem para o sist judiciário)
+- fazer relação salário total (sem cargo)
+- vara da mulher
+- proporção e salaário SP
+```{r}
+df %>% 
+  filter(sexo != 'Indefinido') %>% 
+  mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
+  group_by(cargo1, Sexo) %>% 
+  summarise(rendimento_liquido = median(rendimento_liquido)) %>%
+  ungroup() %>% 
+  mutate(cargo1 = fct_reorder(cargo1, Sexo, fun = function(x) max(prop.table(table(x))))) %>% 
+  mutate(cargo1 = fct_other(cargo1, drop = c('Corregedor', 'Conselheiro', 'Jurista', 'Magistrado'),
+                            other_level = 'Outros')) %>% 
+  ggplot() +
+  geom_col(aes(x = cargo1, y = rendimento_liquido, fill = Sexo), position = 'dodge') +
+  theme_minimal() +
+  labs(x = '', y = 'R$') +
+  theme(legend.position = 'bottom') +
+  ggtitle('Rendimento líquido médio dos magistrados')
+```
+
+```{r}
+df %>% filter(str_detect(lotacao, "Gabinete")) %>% count(lotacao)
+
+
+
+
+df %>% 
+  filter(sexo != 'Indefinido') %>% 
+  mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
+  group_by(cargo1, Sexo) %>% 
+  summarise(rendimento_plus = median(subsidio)) %>%
+  ungroup() %>% 
+  mutate(cargo1 = fct_reorder(cargo1, Sexo, fun = function(x) max(prop.table(table(x))))) %>% 
+  mutate(cargo1 = fct_other(cargo1, drop = c('Corregedor', 'Conselheiro', 'Jurista', 'Magistrado'),
+                            other_level = 'Outros')) %>% 
+  ggplot() +
+  geom_col(aes(x = cargo1, y = rendimento_plus, fill = Sexo), position = 'dodge') +
+  theme_minimal() +
+  labs(x = '', y = 'R$') +
+  theme(legend.position = 'bottom') 
+  #ggtitle('Rendimento líquido médio dos magistrados')
+```
+
+
 
 Supremo Tribunal de Justiça
 
