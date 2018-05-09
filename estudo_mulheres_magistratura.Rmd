@@ -5,11 +5,44 @@ date: "February 26, 2018"
 output: html_document
 ---
 
-INSERIR hierarquia dos cargos
-FALAR Carmem Lúcia
+breve introdução sobre as motivações para o estudo: 
+  tema mulheres, importância da participação feminina na gestão pública.
 
-```{r setup, include=FALSE}
+apresentação do estudo: perguntas norteadoras, quantidade de magistrados e organograma do sistema judiciário que os magistrados ocupam.
+
+alguns números: gŕaficos e suposições
+próximos passos: sugestões recebidas
+
+
+  A criação da Justiça Federal e do Ministério Público federal deu-se em 1890 (http://www.mpu.mp.br/navegacao/institucional/historico) e somente em 1947, 5 anos depois, teve posse a primeira mulher (http://midia.apmp.com.br/arquivos/pdf/artigos/2013_mulheres_ministerio_publico.pdf).
+
+
+
+Falar sobre a mulher no magistrado brasileiro é abordar questões atuais e necessárias. Qualquer informação minimamente significativa que fale sobre a participação da mulher na gestão pública é de concernimento a nível nacional, pois estamos falando sobre avanços da socidade em termos de igualdade e de possíveis mudanças no perfil de decisões no sistema judiciário. 
+
+Tal motivação 
+
+
+
+
+
+
+
+um tema um tanto atual devido a facilitações como a discussão inscendiada sobre o feminismo.
+
+O poder judiciário é composto por ministro, desembargadores e juízes, os quais possuem a função de julgar, de maneira imparcial e isenta, situações e as pessoas nelas envolvidas de acordo com a norma criadas pelo legislativo. 
+
+
+
+INSERIR hierarquia dos cargos
+FALAR Carmem Lúcia - hist presidentes STF
+magistrados  acumulam funções em mais de uma unidade.
+diagrama de venn do JN
+
+```{r, include = FALSE, cache = TRUE}
 library(tidyverse)
+library(abjutils)
+library(janitor)
 
 # dados github github.com/turicas
 # 25.843 dados
@@ -28,10 +61,15 @@ df <- df1 %>%
          nome = str_to_title(nome),
          lotacao = str_to_title(lotacao),
          cargo = str_to_title(cargo)) %>%
-  mutate(orgao = str_replace(orgao, 'Trf', 'Tribunal Regional Federal –')) %>% 
-  distinct(nome, orgao, .keep_all = T) %>% 
-  filter(!str_detect(lotacao, 'Inativ[oa]|Aposentad[oa]|Substitut[oa]|Desligad[oa]|Pensionista'),
-         !str_detect(cargo, 'Inativ[oa]|Aposentad[oa]|Substitut[oa]|Desligad[oa]|Pensionista')) %>%
+  mutate(orgao = str_replace(orgao, 'Trf', 'Tribunal Regional Federal –')) %>%
+  mutate(orgao = str_replace(orgao, 'Tribuanl', 'Tribunal')) %>%
+  distinct(nome, orgao, .keep_all = T) %>%
+  mutate(lotacao = ifelse(is.na(lotacao), 'Indefinido', lotacao), 
+         lotacao = ifelse(str_detect(lotacao, 
+                                     'Inativ[oa]|Aposentad[oa]|Substitut[oa]|Desligad[oa]|Pensionista'), 'Fora', lotacao),
+         lotacao = ifelse(str_detect(cargo, 
+                                     'Inativ[oa]|Aposentad[oa]|Substitut[oa]|Desligad[oa]|Pensionista'), 'Fora', lotacao)) %>%
+  filter(!(lotacao == 'Fora')) %>% 
   mutate(cargo1 = str_extract(cargo, 
                    '[Jj]uiz|Juíza|Desembargador|Des.|Des|Magistrad[oa]|Jurista|Ministr[oa]|Conselheiro|Corregedor')) %>%
   filter(!is.na(cargo1)) %>% 
@@ -42,7 +80,14 @@ df <- df1 %>%
   mutate(nome1 = nome) %>% 
   separate(nome1, into = c('primeiro_nome'), sep = ' ') %>%
   mutate(primeiro_nome = rm_accent(primeiro_nome)) %>% 
-  left_join(nomes_df, by = 'primeiro_nome')
+  mutate(nome = rm_accent(nome)) %>% 
+  left_join(nomes_df, by = 'primeiro_nome') %>% 
+  filter(subsidio != 0) %>% 
+  group_by(nome, subsidio) %>% 
+  arrange(desc(subsidio)) %>% 
+  ungroup() %>% 
+  distinct(nome, .keep_all = T) %>% 
+  filter(sexo != 'Indefinido')
 
 # verificando nomes distintos
 df %>% 
@@ -53,14 +98,14 @@ df %>%
   mutate(sexo = get_gender(nomes_df$primeiro_nome)) %>%
   saveRDS('/home/mfarhat/mulheres_magistratura/nomes_df.rds')
 
-nomes_df <- readRDS('/home/mfarhat/mulheres_magistratura/nomes_df.rds') %>% 
+nomes_df <- readRDS('/home/mfarhat/Documents/ABJ/mulheres_magistratura/nomes_df.rds') %>% 
   mutate(sexo = ifelse(is.na(sexo), 'Indefinido', sexo)) %>% 
   select(primeiro_nome, sexo)
 ```
 
-
+fonte oab: http://www.oab.org.br/institucionalconselhofederal/quadroadvogados
 ```{r}
-oab <- readxl::read_xls(path = '/home/mfarhat/mulheres_magistratura/oab_consnacional.xls') %>% 
+oab <- readxl::read_xls(path = '/home/mfarhat/Documents/ABJ/mulheres_magistratura/oab_consnacional.xls') %>% 
   add_totals_row() %>% 
   filter(Seccional == 'Total')
 
@@ -75,12 +120,13 @@ oab %>%
   mutate(Tipo = ifelse(Tipo == 'Ad', 'Advogados', 'Estagiários')) %>% 
   ggplot() +
   geom_col(aes(x = Tipo, y = Prop, fill = Sexo), position = 'dodge') +
-  theme_minimal() +
+  theme_minimal(16) +
   coord_flip() +
   #ylim(c(0,1)) +
   theme(legend.position = 'bottom') +
+  scale_y_continuous(labels = scales::percent) +
   labs(x = '', y = '') +
-  ggtitle('Proporção de Estágiários e Advogados atuantes no Direito', subtitle = 'Fonte: OAB. 2018')
+  ggtitle('Proporção de atuantes no Direito', subtitle = 'Fonte: Site OAB. 2018')
 ```
 
 ```{r}
@@ -103,22 +149,43 @@ df_plot %>%
   geom_bar(aes(x = cargo1, fill = Sexo), position = 'fill') +
   geom_text(aes(x = cargo1, y = 1-prop, label = label), data = df_aux, nudge_y =0.06) +
   coord_flip() +
-  theme_minimal() +
+  theme_minimal(16) +
   labs(x = '', y = '') +
+  scale_y_continuous(labels = scales::percent) +
   theme(legend.position = 'bottom') +
-  ggtitle('Proporção de magistrados por cargo e sexo')
+  ggtitle('Proporção de magistrados por cargo') #+
+#  ggsave('magistrado_cargo.eps', dpi = 1200)
+```
+
+```{r}
+df %>%
+  mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
+  count(Sexo) %>% 
+  #group_by(Sexo) %>%
+  mutate(prop = n/sum(n)) %>% 
+  #add_totals_row() %>%
+  #summarise(prop = n/sum(n)) %>% 
+  #filter(str_detect(lotacao, '[Mm]ulher')) %>% 
+  ggplot() +
+  geom_col(aes(x = Sexo, y = n)) +
+  geom_text(aes(x = Sexo, y = 1-prop, label = scales::percent(prop)), nudge_y = 5) +
+  #coord_flip() +
+  theme_minimal(16) +
+  labs(x = '', y = '') +
+  scale_y_continuous(labels = scales::percent) +
+  theme(legend.position = 'bottom') +
+  ggtitle('Proporção de Magistrados') 
 ```
 
 
-(incentivo para mulheres irem para o sist judiciário)
-- fazer relação salário total (sem cargo)
 - vara da mulher
 - proporção e salaário SP
+
 ```{r}
 df %>% 
-  filter(sexo != 'Indefinido') %>% 
   mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
   group_by(cargo1, Sexo) %>% 
+  #filter(rendimento_liquido > 60.000)
   summarise(rendimento_liquido = median(rendimento_liquido)) %>%
   ungroup() %>% 
   mutate(cargo1 = fct_reorder(cargo1, Sexo, fun = function(x) max(prop.table(table(x))))) %>% 
@@ -126,35 +193,49 @@ df %>%
                             other_level = 'Outros')) %>% 
   ggplot() +
   geom_col(aes(x = cargo1, y = rendimento_liquido, fill = Sexo), position = 'dodge') +
-  theme_minimal() +
-  labs(x = '', y = 'R$') +
+  theme_minimal(16) +
+  labs(x = '', y = '') +
+  scale_y_continuous(labels = scales::dollar) +
   theme(legend.position = 'bottom') +
   ggtitle('Rendimento líquido médio dos magistrados')
 ```
 
+paradoxo de simpson
+ 
 ```{r}
-df %>% filter(str_detect(lotacao, "Gabinete")) %>% count(lotacao)
-
-
-
-
 df %>% 
-  filter(sexo != 'Indefinido') %>% 
   mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
-  group_by(cargo1, Sexo) %>% 
-  summarise(rendimento_plus = median(subsidio)) %>%
+  group_by(Sexo) %>% 
+  summarise(rendimento_plus = mean(rendimento_liquido)) %>%
   ungroup() %>% 
-  mutate(cargo1 = fct_reorder(cargo1, Sexo, fun = function(x) max(prop.table(table(x))))) %>% 
-  mutate(cargo1 = fct_other(cargo1, drop = c('Corregedor', 'Conselheiro', 'Jurista', 'Magistrado'),
-                            other_level = 'Outros')) %>% 
   ggplot() +
-  geom_col(aes(x = cargo1, y = rendimento_plus, fill = Sexo), position = 'dodge') +
+  geom_col(aes(x = Sexo, y = rendimento_plus, fill = Sexo), width = 0.5) +
+  #geom_text(aes(x = Sexo, y = rendimento_plus, label = rendimento_plus), nudge_y = 1050) +
   theme_minimal() +
   labs(x = '', y = 'R$') +
-  theme(legend.position = 'bottom') 
-  #ggtitle('Rendimento líquido médio dos magistrados')
+  theme(legend.position = 'bottom') +
+  theme_minimal(16) +
+  labs(x = '', y = '') +
+  scale_y_continuous(labels = scales::dollar) +
+  theme(legend.position = 'none') +
+  ggtitle('Rendimento líquido médio dos magistrados')
 ```
 
+```{r}
+df %>%
+  mutate(Sexo = ifelse(sexo == 'Female', 'Feminino', 'Masculino')) %>% 
+  filter(str_detect(lotacao, '[Mm]ulher')) %>% 
+  count(Sexo)
+  ggplot() +
+  geom_bar(aes(x = cargo1, fill = Sexo), position = 'fill', width = 0.6) +
+  #geom_text(aes(x = cargo1, y = 1-prop, label = label), data = df_aux, nudge_y =0.06) +
+  coord_flip() +
+  theme_minimal(16) +
+  labs(x = '', y = '') +
+  scale_y_continuous(labels = scales::percent) +
+  theme(legend.position = 'bottom') +
+  ggtitle('Proporção de Magistrados', subtitle = 'Varas e Juizados de proteção à Mulher')
+```
 
 
 Supremo Tribunal de Justiça
@@ -238,3 +319,90 @@ A Justiça Federal é composta pelos tribunais regionais federais e juízes fede
 
 ### Tribunal de Justiça Militar
 *OK*
+
+```{r}
+library(tidyverse)
+library(httr)
+library(rvest)
+library(janitor)
+library(abjutils)
+library(glue)
+
+# baixar dados OAB -------------------------------------------------------------
+loc <- locale(decimal_mark = ",", grouping_mark = ".")
+tab_oab <- "http://www.oab.org.br/institucionalconselhofederal/quadroadvogados" %>% 
+  GET() %>% 
+  read_html() %>% 
+  html_node("#divTotalPorSexo > div > table") %>% 
+  html_table(header = TRUE, fill = TRUE) %>% 
+  clean_names() %>% 
+  as_tibble() %>% 
+  set_names(rm_accent) %>% 
+  filter(!seccional %in% c("TOTAL", "SECCIONAL")) %>% 
+  gather(tipo_sexo, qtd, -seccional) %>%
+  mutate(qtd = parse_number(qtd, locale = loc)) %>% 
+  separate(tipo_sexo, c("tipo", "sexo"), 7) %>% 
+  mutate(sexo = if_else(str_detect(sexo, "2"), "masculino", "feminino")) %>% 
+  spread(sexo, qtd) %>% 
+  mutate(razao = feminino / (feminino + masculino)) %>%
+  filter(!tipo %in% "total") %>% 
+  rename(uf = seccional) %>% 
+  filter(tipo != "supleme")
+
+# tab_oab %>% 
+#   mutate(uf = fct_reorder2(uf, fct_rev(tipo), razao)) %>% 
+#   ggplot(aes(x = uf, y = razao)) +
+#   geom_col() +
+#   facet_wrap(~tipo) +
+#   coord_flip()
+
+# download dos dados do IBGE ---------------------------------------------------
+u_ibge <- str_glue(
+  "ftp://geoftp.ibge.gov.br/organizacao_do_territorio/",
+  "malhas_territoriais/malhas_municipais/",
+  "municipio_2016/Brasil/BR/br_unidades_da_federacao.zip"
+)
+
+dir.create("Downloads/shp/")
+GET(u_ibge, write_disk("Downloads/shp/sp.zip"), progress())
+unzip("Downloads/shp/sp.zip", exdir = "Downloads/shp/")
+
+# depara de codigos e ufs
+data(cadmun, package = "abjData")
+cadmun_uf <- cadmun %>% 
+  distinct(uf, cod = UFCOD)
+
+# carrega dados do mapa e merja ------------------------------------------------
+d_sf_uf <- "Downloads/shp/BRUFE250GC_SIR.shp" %>% 
+  sf::st_read(quiet = TRUE) %>% 
+  mutate(cod = as.numeric(as.character(CD_GEOCUF))) %>% 
+  inner_join(cadmun_uf, "cod") %>% 
+  inner_join(tab_oab, "uf")
+
+# plot -------------------------------------------------------------------------
+mapear <- function(d) {
+  lb <- paste0(c("<", rep("", 4)), scales::percent(seq(.4, .6, .05)))
+  d %>% 
+    mutate(razao = if_else(razao < .4, .4, razao)) %>% 
+    ggplot() +
+    geom_sf(aes(fill = razao)) +
+    scale_fill_distiller(palette = "RdBu", limits = c(.4, .6),
+                         breaks = seq(.4, .6, .05),
+                         labels = lb) +
+    theme_void() +
+    labs(fill = "% Fem.") +
+    ggtitle(if_else(d$tipo[1] == "advogad", "Proporção de advogadas por região", "Proporção de estagiárias por região")) +
+    theme(panel.grid.major = element_line(color = "white"))
+}
+
+d_mapas <- d_sf_uf %>% 
+  group_by(tipo) %>% 
+  #filter(tipo == 'advogad') %>% 
+  do(mapa = mapear(.))
+
+png("estagiarias_oab.png", width = 8, height = 7, units = "cm", res = 500)
+#tiff("advogadas_oab.tiff", width = 8, height = 7,units = "cm", res = 500)
+gridExtra::grid.arrange(grobs = d_mapas$mapa, nrow = 1)
+dev.off()
+```
+

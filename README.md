@@ -5,6 +5,7 @@ Repositório do estudo 'A participação da mulher nas decisões do Sistema Judi
 
 O trabalho tem a intenção de discutir através dos dados a participação da mulher nos papéis de decisão do sistema judiciário brasileiro.
 
+- mulheres negras no supremo: https://www.jota.info/justica/mulheres-negras-magistratura-18042018
 
 Referências Bibliográficas:
 
